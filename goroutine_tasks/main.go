@@ -35,7 +35,7 @@ func main() {
 		taskList = append(taskList, Task{i})
 	}
 
-	// Number of naximum concurrent tasks
+	// Number of maximum concurrent tasks
 	maxConcurrentTaskCounter := 10
 
 	// Number of current running concurrent tasks
