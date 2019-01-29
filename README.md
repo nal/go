@@ -1,0 +1,4 @@
+# Personal Golang examples
+
+## Enjoy!
+
