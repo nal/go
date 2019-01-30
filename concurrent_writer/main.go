@@ -68,7 +68,7 @@ func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}, taskCounte
 
 	logger.Printf(logFmt, "Finished task", rcv.ID, time.Now())
 
-	// Block channel and notofy we have filled a buffer
+	// Block channel and notify we have filled a buffer
 	logChan <- struct{}{}
 
 	// Decrease number of worker goroutines
