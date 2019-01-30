@@ -31,13 +31,14 @@ func (logW *LogWriter) Write(buf *bytes.Buffer) {
 
 	// File is closed or rotating
 	if logW.fd == nil {
-		log.Println("Reopen file!")
 		logW.filePath = fmt.Sprintf("tmp_%02d%02d.txt", hour, min)
 
 		f, err := os.OpenFile(logW.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		log.Printf("Open or rotate file %s: ", logW.filePath)
 
 		// Store new file handler
 		logW.fd = f
@@ -52,8 +53,12 @@ func (logW *LogWriter) Write(buf *bytes.Buffer) {
 func (logW *LogWriter) Close() {
 	// File is opened
 	if logW.fd != nil {
+		// Close file
 		if err := logW.fd.Close(); err != nil {
 			log.Println(err)
+		} else {
+			// Drop file handler or else file will not reopen!
+			logW.fd = nil
 		}
 	}
 }
@@ -92,7 +97,7 @@ func main() {
 	var taskList = []Task{}
 
 	// Maximum number of tasks
-	maxTaskCounter := 10
+	maxTaskCounter := 100
 
 	// Populate task array
 	for i := 1; i <= maxTaskCounter; i++ {
