@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 )
@@ -61,13 +62,11 @@ func (logW LogWriter) Close() {
 func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}) {
 	logger.Printf(logFmt, "Started task", rcv.ID, time.Now())
 	// Sleep for random time to test log file rotation.
-	// r := rand.New(rand.NewSource(130))
+	sleepSeconds := time.Duration(rand.Int31n(20)+10) * time.Second
+	log.Printf("Sleep for %v seconds!", sleepSeconds)
+	logger.Printf("Task %d sleep for %v seconds!", rcv.ID, sleepSeconds)
+	time.Sleep(sleepSeconds)
 
-	// r := rand.Intn(120)
-	// sleepSeconds := time.Duration(int64(r))
-	// log.Printf("Sleep for %d seconds!", sleepSeconds)
-	// time.Sleep(sleepSeconds * time.Second)
-	time.Sleep(130 * time.Second)
 	logger.Printf(logFmt, "Finished task", rcv.ID, time.Now())
 	logChan <- struct{}{}
 }
@@ -125,9 +124,9 @@ loop:
 			logW.Close()
 			log.Println("Rotate!")
 
-		case <-logChan:
-			// Wait for task to complete
-			log.Println("Task done!")
+		case res := <-logChan:
+			// BUG: wait for _first_ task to complete, not all!!!
+			log.Printf("Task done! res = %v\n", res)
 			break loop
 		}
 	}
