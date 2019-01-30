@@ -58,28 +58,30 @@ func (logW LogWriter) Close() {
 }
 
 // WriteLog Task method
-func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}) {
+func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}, taskCounterChan <-chan struct{}) {
 	logger.Printf(logFmt, "Started task", rcv.ID, time.Now())
 
-	// Sleep for random time + 60 seconds to test log file rotation.
-	sleepSeconds := time.Duration(rand.Int31n(20)+60) * time.Second
-	log.Printf("Sleep for %v seconds!", sleepSeconds)
-	logger.Printf("Task %d sleep for %v seconds!", rcv.ID, sleepSeconds)
+	// Sleep for random time more than 60 seconds to test log file rotation.
+	sleepSeconds := time.Duration(rand.Int31n(60)+20) * time.Second
+	logger.Printf("%-15s %2d sleep for %v\n", "Task", rcv.ID, sleepSeconds)
 	time.Sleep(sleepSeconds)
 
 	logger.Printf(logFmt, "Finished task", rcv.ID, time.Now())
+
+	// Block channel and notofy we have filled a buffer
 	logChan <- struct{}{}
+
+	// Decrease number of worker goroutines
+	<-taskCounterChan
 }
 
 // Solution: main function spawns worker goroutines with `task.WriteLog` method.
 // These methods write data to `*bytes.Buffer` and blocks.
-// In `for-select-case` block we read data from 3 channels:
+// In `for-select-case` block we read data from 4 channels:
 // * flush file timer (to flush buffer to file and flush file to filesystem)
 // * rotate file timer (to do the same as flush file timer plus close file handler)
 // * log channel (write to buffer and write it to log file)
-// Currently there is a BUG with `for-select-case` block.
-// Code wait for _first_ `task.WriteLog()` task and terminate.
-// Need to fix this behavior.
+// * worker count channel (abort execution, all workers finished)
 func main() {
 	// Init empty LogWriter
 	logW := LogWriter{filePath: "", fd: nil}
@@ -95,6 +97,10 @@ func main() {
 	for i := 1; i <= maxTaskCounter; i++ {
 		taskList = append(taskList, Task{i})
 	}
+
+	// Number of current running concurrent tasks
+	taskCounterChan := make(chan struct{}, maxTaskCounter)
+	defer close(taskCounterChan)
 
 	// Channel to block writes to log file
 	logChan := make(chan struct{})
@@ -113,28 +119,38 @@ func main() {
 
 	for _, task := range taskList {
 		logger.Printf(logFmt, "Enqueue task", task.ID, time.Now())
-		go task.WriteLog(logger, logChan)
+		taskCounterChan <- struct{}{}
+		go task.WriteLog(logger, logChan, taskCounterChan)
 	}
+
+	log.Println("All tasks enqueued...")
 
 loop:
 	for {
 		select {
+
 		case <-tickerFlush.C:
 			// flush the buffer, write to log file
 			logW.Write(&buf)
-			log.Println("Flush!")
+			log.Println("Flush buffer to file...") // DEBUG
 
 		case <-tickerRotate.C:
 			// flush the buffer, write to log file, close log file
 			logW.Write(&buf)
 			logW.Close()
-			log.Println("Rotate!")
+			log.Println("Rotate file...") // DEBUG
 
-		case res := <-logChan:
-			// BUG: wait for _first_ task to complete, not all!!!
+		case <-logChan:
 			logW.Write(&buf)
-			log.Printf("Task done! res = %v\n", res)
-			break loop
+			log.Println("Task done...") // DEBUG
+
+		default:
+			// Wait for all goroutines to finish
+			if len(taskCounterChan) == 0 {
+				break loop
+			}
 		}
 	}
+
+	log.Println("All tasks finished...")
 }
