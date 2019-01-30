@@ -24,13 +24,14 @@ type LogWriter struct {
 }
 
 // Create and write to file hander.
-func (logW LogWriter) Write(buf *bytes.Buffer) {
+func (logW *LogWriter) Write(buf *bytes.Buffer) {
 	ctime := time.Now()
 	hour := ctime.Hour()
 	min := ctime.Minute()
 
 	// File is closed or rotating
 	if logW.fd == nil {
+		log.Println("Reopen file!")
 		logW.filePath = fmt.Sprintf("tmp_%02d%02d.txt", hour, min)
 
 		f, err := os.OpenFile(logW.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -48,7 +49,7 @@ func (logW LogWriter) Write(buf *bytes.Buffer) {
 }
 
 // Close filehandler
-func (logW LogWriter) Close() {
+func (logW *LogWriter) Close() {
 	// File is opened
 	if logW.fd != nil {
 		if err := logW.fd.Close(); err != nil {
