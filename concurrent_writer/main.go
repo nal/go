@@ -24,7 +24,6 @@ type LogWriter struct {
 }
 
 // Create and write to file hander.
-// func (myW *MyWriter) Write(w io.Writer) {
 func (logW LogWriter) Write(buf *bytes.Buffer) {
 	ctime := time.Now()
 	hour := ctime.Hour()
@@ -61,8 +60,9 @@ func (logW LogWriter) Close() {
 // WriteLog Task method
 func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}) {
 	logger.Printf(logFmt, "Started task", rcv.ID, time.Now())
-	// Sleep for random time to test log file rotation.
-	sleepSeconds := time.Duration(rand.Int31n(20)+10) * time.Second
+
+	// Sleep for random time + 60 seconds to test log file rotation.
+	sleepSeconds := time.Duration(rand.Int31n(20)+60) * time.Second
 	log.Printf("Sleep for %v seconds!", sleepSeconds)
 	logger.Printf("Task %d sleep for %v seconds!", rcv.ID, sleepSeconds)
 	time.Sleep(sleepSeconds)
@@ -71,9 +71,15 @@ func (rcv Task) WriteLog(logger *log.Logger, logChan chan<- struct{}) {
 	logChan <- struct{}{}
 }
 
-// Write access to global variables within goroutines is thread unsafe.
-// Create a channel to communicate in gorounites and control number
-// of already running goroutines.
+// Solution: main function spawns worker goroutines with `task.WriteLog` method.
+// These methods write data to `*bytes.Buffer` and blocks.
+// In `for-select-case` block we read data from 3 channels:
+// * flush file timer (to flush buffer to file and flush file to filesystem)
+// * rotate file timer (to do the same as flush file timer plus close file handler)
+// * log channel (write to buffer and write it to log file)
+// Currently there is a BUG with `for-select-case` block.
+// Code wait for _first_ `task.WriteLog()` task and terminate.
+// Need to fix this behavior.
 func main() {
 	// Init empty LogWriter
 	logW := LogWriter{filePath: "", fd: nil}
@@ -90,7 +96,7 @@ func main() {
 		taskList = append(taskList, Task{i})
 	}
 
-	// Channel to write lot log file
+	// Channel to block writes to log file
 	logChan := make(chan struct{})
 	defer close(logChan)
 
@@ -126,10 +132,9 @@ loop:
 
 		case res := <-logChan:
 			// BUG: wait for _first_ task to complete, not all!!!
+			logW.Write(&buf)
 			log.Printf("Task done! res = %v\n", res)
 			break loop
 		}
 	}
-
-	logW.Write(&buf)
 }
