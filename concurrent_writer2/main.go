@@ -120,7 +120,7 @@ func (rcv *Task) Run(buf []byte, logChan chan<- struct{}, taskCounterChan <-chan
 // * worker count channel (abort execution, all workers finished)
 func main() {
 	// Init empty LogWriter
-	logF := LogFile{p: []byte(""), filePath: "", fd: nil}
+	logF := LogFile{filePath: "", fd: nil}
 	defer logF.closeFile()
 
 	// Array of Task structures
