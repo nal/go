@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
@@ -93,16 +94,19 @@ func (logF *LogFile) rotateFile() {
 }
 
 // Run Task method. Do nothing useful, just fill buffer with debug data.
-func (rcv *Task) Run(buf []byte, logChan chan<- struct{}, taskCounterChan <-chan struct{}) {
+func (rcv *Task) Run(buf *bytes.Buffer, logChan chan<- struct{}, taskCounterChan <-chan struct{}) {
 	log.Printf(logFmt, "Started task", rcv.ID, time.Now())
-	buf = append([]byte(fmt.Sprintf(logFmt, "Started task", rcv.ID, time.Now())))
+	buf.Write([]byte(fmt.Sprintf(logFmt, "Started task", rcv.ID, time.Now())))
 
 	// Sleep for random time more than 60 seconds to test log file rotation.
-	sleepSeconds := time.Duration(rand.Int31n(20)+20) * time.Second
-	buf = append([]byte(fmt.Sprintf("%-15s %2d sleep for %v\n", "Task", rcv.ID, sleepSeconds)))
+	sleepSeconds := time.Duration(rand.Int31n(30)+20) * time.Second
+
+	log.Printf("%-15s %2d sleep for %v\n", "Started task", rcv.ID, sleepSeconds)
+	buf.Write(([]byte(fmt.Sprintf("%-15s %2d sleep for %v\n", "Started task", rcv.ID, sleepSeconds))))
+
 	time.Sleep(sleepSeconds)
 
-	buf = append([]byte(fmt.Sprintf(logFmt, "Finished task", rcv.ID, time.Now())))
+	buf.Write(([]byte(fmt.Sprintf(logFmt, "Finished task", rcv.ID, time.Now()))))
 
 	// Block channel and notify we have filled a buffer
 	logChan <- struct{}{}
@@ -127,7 +131,7 @@ func main() {
 	var taskList = []*Task{}
 
 	// Maximum number of tasks
-	maxTaskCounter := 20
+	maxTaskCounter := 200
 
 	// Populate task array
 	for i := 1; i <= maxTaskCounter; i++ {
@@ -142,19 +146,15 @@ func main() {
 	logChan := make(chan struct{})
 	defer close(logChan)
 
-	var (
-		buf []byte
-		// buf    bytes.Buffer
-		// logger = log.New(&buf, "logger: ", log.Lshortfile)
-	)
+	// Shared buffer across goroutines
+	var buf bytes.Buffer
 
 	tickerRotate := time.NewTicker(60 * time.Second)
 	defer tickerRotate.Stop()
 
 	for _, task := range taskList {
-		// buf = append(buf, byte(fmt.Sprintf(logFmt, "Enqueue task", task.ID, time.Now())))
 		taskCounterChan <- struct{}{}
-		go task.Run(buf, logChan, taskCounterChan)
+		go task.Run(&buf, logChan, taskCounterChan)
 	}
 
 	log.Println("All tasks enqueued...")
@@ -169,8 +169,16 @@ loop:
 			log.Println("Rotate file...") // DEBUG
 
 		case <-logChan:
-			logF.Write(buf)
-			log.Println("Task done...") // DEBUG
+			p := buf.Bytes()
+			buf.Reset()
+			_, err := logF.Write(p)
+			if err != nil {
+				log.Fatalf("Failed to write to log file: %s", err)
+
+			} else {
+				// buf.Reset()
+				log.Println("Task done...") // DEBUG
+			}
 
 		default:
 			// Wait for all goroutines to finish
