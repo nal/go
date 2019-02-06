@@ -143,6 +143,7 @@ func main() {
 	defer close(logChan)
 
 	// Shared buffer across goroutines
+	// TODO: use "sync/atomic" package to "lock" filename across goroutines
 	var buf bytes.Buffer
 
 	// Rotae log file ticker channel
