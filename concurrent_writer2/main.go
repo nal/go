@@ -27,7 +27,6 @@ type LogWriter interface {
 
 // LogFile struct
 type LogFile struct {
-	// p        []byte
 	filePath string
 	fd       *os.File
 }
