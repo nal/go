@@ -34,7 +34,6 @@ type LogFile struct {
 // Implementing io.Writer interface
 // Write to underlying data stream.
 func (logF *LogFile) Write(p []byte) (n int, err error) {
-
 	// File is closed or rotating
 	if logF.fd == nil {
 		logF.openFile()
@@ -49,7 +48,6 @@ func (logF *LogFile) Write(p []byte) (n int, err error) {
 
 	logF.fd.Sync()
 	return n, nil
-	// buf.Reset()
 }
 
 // openFile opens log file. Panic if operation failed.
@@ -114,10 +112,9 @@ func (rcv *Task) Run(buf *bytes.Buffer, logChan chan<- struct{}, taskCounterChan
 	<-taskCounterChan
 }
 
-// Solution: main function spawns worker goroutines with `task.WriteLog` method.
+// Solution: main function spawns worker goroutines with `LogWriter.Write` method.
 // These methods write data to `*bytes.Buffer` and blocks.
-// In `for-select-case` block we read data from 4 channels:
-// * flush file timer (to flush buffer to file and flush file to filesystem)
+// In `for-select-case` block we read data from 3 channels:
 // * rotate file timer (to do the same as flush file timer plus close file handler)
 // * log channel (write to buffer and write it to log file)
 // * worker count channel (abort execution, all workers finished)
@@ -148,9 +145,11 @@ func main() {
 	// Shared buffer across goroutines
 	var buf bytes.Buffer
 
+	// Rotae log file ticker channel
 	tickerRotate := time.NewTicker(60 * time.Second)
 	defer tickerRotate.Stop()
 
+	// Run tasks in goroutine
 	for _, task := range taskList {
 		taskCounterChan <- struct{}{}
 		go task.Run(&buf, logChan, taskCounterChan)
@@ -163,7 +162,6 @@ loop:
 		select {
 
 		case <-tickerRotate.C:
-			// flush the buffer, write to log file, close log file
 			logF.rotateFile()
 			log.Println("Rotate file...") // DEBUG
 
@@ -175,7 +173,6 @@ loop:
 				log.Fatalf("Failed to write to log file: %s", err)
 
 			} else {
-				// buf.Reset()
 				log.Println("Task done...") // DEBUG
 			}
 
