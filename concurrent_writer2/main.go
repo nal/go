@@ -91,12 +91,13 @@ func (logF *LogFile) rotateFile() {
 }
 
 // Run Task method. Do nothing useful, just fill buffer with debug data.
-func (rcv *Task) Run(buf *bytes.Buffer, logChan chan<- struct{}, taskCounterChan <-chan struct{}) {
+func (rcv *Task) Run(logChan chan<- bytes.Buffer, taskCounterChan <-chan struct{}) {
+	var buf bytes.Buffer
 	log.Printf(logFmt, "Started task", rcv.ID, time.Now())
 	buf.Write([]byte(fmt.Sprintf(logFmt, "Started task", rcv.ID, time.Now())))
 
 	// Sleep for random time more than 60 seconds to test log file rotation.
-	sleepSeconds := time.Duration(rand.Int31n(30)+20) * time.Second
+	sleepSeconds := time.Duration(rand.Int31n(60)+20) * time.Second
 
 	log.Printf("%-15s %2d sleep for %v\n", "Started task", rcv.ID, sleepSeconds)
 	buf.Write(([]byte(fmt.Sprintf("%-15s %2d sleep for %v\n", "Started task", rcv.ID, sleepSeconds))))
@@ -106,7 +107,7 @@ func (rcv *Task) Run(buf *bytes.Buffer, logChan chan<- struct{}, taskCounterChan
 	buf.Write(([]byte(fmt.Sprintf(logFmt, "Finished task", rcv.ID, time.Now()))))
 
 	// Block channel and notify we have filled a buffer
-	logChan <- struct{}{}
+	logChan <- buf
 
 	// Decrease number of worker goroutines
 	<-taskCounterChan
@@ -139,12 +140,11 @@ func main() {
 	defer close(taskCounterChan)
 
 	// Channel to block writes to log file
-	logChan := make(chan struct{})
+	logChan := make(chan bytes.Buffer)
 	defer close(logChan)
 
 	// Shared buffer across goroutines
 	// TODO: use "sync/atomic" package to "lock" filename across goroutines
-	var buf bytes.Buffer
 
 	// Rotae log file ticker channel
 	tickerRotate := time.NewTicker(60 * time.Second)
@@ -153,7 +153,7 @@ func main() {
 	// Run tasks in goroutine
 	for _, task := range taskList {
 		taskCounterChan <- struct{}{}
-		go task.Run(&buf, logChan, taskCounterChan)
+		go task.Run(logChan, taskCounterChan)
 	}
 
 	log.Println("All tasks enqueued...")
@@ -164,17 +164,16 @@ loop:
 
 		case <-tickerRotate.C:
 			logF.rotateFile()
-			log.Println("Rotate file...") // DEBUG
+			log.Println("Rotate file...")
 
-		case <-logChan:
-			p := buf.Bytes()
-			buf.Reset()
-			_, err := logF.Write(p)
+		case p := <-logChan:
+			_, err := logF.Write(p.Bytes())
 			if err != nil {
 				log.Fatalf("Failed to write to log file: %s", err)
 
 			} else {
-				log.Println("Task done...") // DEBUG
+				p.Reset()
+				log.Println("Task done...")
 			}
 
 		default:
