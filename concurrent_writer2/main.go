@@ -146,7 +146,7 @@ func main() {
 	// Shared buffer across goroutines
 	// TODO: use "sync/atomic" package to "lock" filename across goroutines
 
-	// Rotae log file ticker channel
+	// Rotate log file ticker channel
 	tickerRotate := time.NewTicker(60 * time.Second)
 	defer tickerRotate.Stop()
 
