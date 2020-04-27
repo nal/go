@@ -40,11 +40,11 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 	body := &webhookReqBody{}
 	if err := json.NewDecoder(req.Body).Decode(body); err != nil {
 		// Log error
-		tgbotLogger.Info("Could not decode request body",
+		tgbotLogger.Info("Could not decode request body: ",
 			"body", req.Body,
 			"err", err)
 
-		// Return smth useful for tests
+		// Return smth useful for testing
 		fmt.Fprintf(res, "%q", "Invalid request")
 		return
 	}
@@ -56,16 +56,18 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if err := sayEcho(response); err != nil {
-		tgbotLogger.Info("Error in sending reply",
+		tgbotLogger.Info("Failed to send reply in func sayEcho: ",
 			"err", err)
-		// fmt.Println("error in sending reply:", err)
+
+		// Return smth useful for testing
+		fmt.Fprintf(res, "%q", "Failed to send reply")
 		return
 	}
 
-	// actually send
+	// Output the same response for testing
 	fmt.Fprintf(res, "Hello, %q", body.Message.Text)
 
-	// log a confirmation message if the message was sent successfully
+	// Log a confirmation message if the message was sent successfully
 	tgbotLogger.Info("Reply sent...")
 }
 
