@@ -8,7 +8,7 @@ I set it up it using personal subdomain and `Nginx` webserver.
 TLS support is enabled using Let's Encrypt certificate.
 Webserver proxies all requests from public IP
 to localhost where telegram bot is listens to incoming requests.
-It is actully deployed and can be tested by searching for `nal_test_bot` in Telegram
+It is actually deployed and can be tested by searching for `nal_test_bot` in Telegram
 and chatting to them.
 
 ## Initialization of module dependecies
