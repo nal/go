@@ -4,7 +4,7 @@ In order to compare different implementations I created tests and benchmarks.
 
 Run
 ```
-make benchmark
+make run_benchmarks
 ```
 to see benchmark results.
 
